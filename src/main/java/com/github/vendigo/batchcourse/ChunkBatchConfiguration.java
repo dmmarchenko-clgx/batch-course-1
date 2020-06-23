@@ -7,7 +7,9 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.item.ItemReader;
-import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
+import org.springframework.batch.item.database.PagingQueryProvider;
+import org.springframework.batch.item.database.builder.JdbcPagingItemReaderBuilder;
+import org.springframework.batch.item.database.support.SqlPagingQueryProviderFactoryBean;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
@@ -16,7 +18,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,8 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 public class ChunkBatchConfiguration {
 
     private static final String[] COLUMN_NAMES = new String[] { "order_id", "first_name", "last_name", "email", "cost", "item_id", "item_name", "ship_date" };
-    private static final String ORDER_SQL = "select order_id, first_name, last_name, email, cost, item_id, item_name, ship_date "
-        + " from SHIPPED_ORDER order by order_id";
+    private static final int CHUNK_SIZE = 10;
 
     private final JobBuilderFactory jobBuilderFactory;
     private final StepBuilderFactory stepBuilderFactory;
@@ -39,7 +39,7 @@ public class ChunkBatchConfiguration {
     private Resource flatFile;
 
     @Bean
-    public Job chunkBasedJob() {
+    public Job chunkBasedJob() throws Exception {
         return jobBuilderFactory.get("chunkBasedJob")
             .start(chunkBasedStep())
             .build();
@@ -63,19 +63,30 @@ public class ChunkBatchConfiguration {
     }
 
     @Bean
-    public ItemReader<Order> dbItemReader() {
-        return new JdbcCursorItemReaderBuilder<Order>()
+    public PagingQueryProvider queryProvider() throws Exception {
+        SqlPagingQueryProviderFactoryBean factory = new SqlPagingQueryProviderFactoryBean();
+        factory.setSelectClause("select order_id, first_name, last_name, email, cost, item_id, item_name, ship_date");
+        factory.setFromClause("from SHIPPED_ORDER");
+        factory.setSortKey("order_id");
+        factory.setDataSource(dataSource);
+        return factory.getObject();
+    }
+
+    @Bean
+    public ItemReader<Order> dbItemReader() throws Exception {
+        return new JdbcPagingItemReaderBuilder<Order>()
             .dataSource(dataSource)
             .name("jdbcCursorItemReader")
-            .sql(ORDER_SQL)
+            .queryProvider(queryProvider())
             .rowMapper(orderRowMapper)
+            .pageSize(CHUNK_SIZE)
             .build();
     }
 
     @Bean
-    public Step chunkBasedStep() {
+    public Step chunkBasedStep() throws Exception {
         return stepBuilderFactory.get("chunkBasedStep")
-            .<Order, Order>chunk(3)
+            .<Order, Order>chunk(CHUNK_SIZE)
             .reader(dbItemReader())
             .writer(list -> log.info("Writing items: {}", list))
             .build();
