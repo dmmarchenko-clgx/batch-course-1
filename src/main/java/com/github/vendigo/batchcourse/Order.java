@@ -3,9 +3,11 @@ package com.github.vendigo.batchcourse;
 import java.math.BigDecimal;
 import java.util.Date;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class Order {
     private Long orderId;
     private String firstName;
