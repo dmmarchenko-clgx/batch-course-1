@@ -4,14 +4,18 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.job.builder.FlowBuilder;
+import org.springframework.batch.core.job.flow.Flow;
+import org.springframework.batch.core.job.flow.support.SimpleFlow;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-//@Configuration
+@Configuration
 @AllArgsConstructor
 @Slf4j
 public class DeliveryBatchConfiguration {
@@ -22,10 +26,9 @@ public class DeliveryBatchConfiguration {
     private final CorrectItemDecider correctItemDecider;
 
     @Bean
-    public Job deliverPackageJob() {
-        return jobBuilderFactory.get("deliverPackageJob")
-            .start(packageItemStep())
-            .next(driveToAddressStep())
+    public Flow deliveryFlow() {
+        return new FlowBuilder<SimpleFlow>("deliveryFlow")
+            .start(driveToAddressStep())
             .on("FAILED").to(storePackageStep())
             .from(driveToAddressStep())
             .on("*").to(deliveryDecider)
@@ -33,6 +36,15 @@ public class DeliveryBatchConfiguration {
             .next(correctItemDecider).on("CORRECT_ITEM").to(thankCustomerStep())
             .from(correctItemDecider).on("WRONG_ITEM").to(givingRefundStep())
             .from(deliveryDecider).on("NOT_PRESENT").to(leaveAtDoorStep())
+            .build();
+    }
+
+    @Bean
+    public Job deliverPackageJob() {
+        return jobBuilderFactory.get("deliverPackageJob")
+            .start(packageItemStep())
+            .split(new SimpleAsyncTaskExecutor())
+            .add(deliveryFlow(), billingFlow())
             .end()
             .build();
     }
@@ -111,6 +123,37 @@ public class DeliveryBatchConfiguration {
         return stepBuilderFactory.get("givingRefundStep")
             .tasklet((stepContribution, chunkContext) -> {
                 log.info("Refunding money for the wrong item");
+                return RepeatStatus.FINISHED;
+            })
+            .build();
+    }
+
+    @Bean
+    public Step nestedBillingJobStep() {
+        return stepBuilderFactory.get("nestedBillingJobStep")
+            .job(billingJob())
+            .build();
+    }
+
+    @Bean
+    public Flow billingFlow() {
+        return new FlowBuilder<SimpleFlow>("billingFlow")
+            .start(sendInvoiceStep())
+            .build();
+    }
+
+    @Bean
+    public Job billingJob() {
+        return jobBuilderFactory.get("billingJob")
+            .start(sendInvoiceStep())
+            .build();
+    }
+
+    @Bean
+    public Step sendInvoiceStep() {
+        return stepBuilderFactory.get("sendInvoiceStep")
+            .tasklet((stepContribution, chunkContext) -> {
+                log.info("Sending invoice");
                 return RepeatStatus.FINISHED;
             })
             .build();
