@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.config;
 
 import javax.sql.DataSource;
 
@@ -6,6 +6,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.PagingQueryProvider;
@@ -20,11 +21,20 @@ import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
 import org.springframework.batch.item.json.JacksonJsonObjectMarshaller;
 import org.springframework.batch.item.json.builder.JsonFileItemWriterBuilder;
+import org.springframework.batch.item.support.builder.CompositeItemProcessorBuilder;
+import org.springframework.batch.item.validator.BeanValidatingItemProcessor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+
+import com.github.vendigo.batchcourse.model.Order;
+import com.github.vendigo.batchcourse.model.TrackedOrder;
+import com.github.vendigo.batchcourse.utils.FreeShippingProcessor;
+import com.github.vendigo.batchcourse.utils.OrderFieldSetMapper;
+import com.github.vendigo.batchcourse.utils.OrderRowMapper;
+import com.github.vendigo.batchcourse.utils.TrackedOrderItemProcessor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +56,8 @@ public class ChunkBatchConfiguration {
     private final DataSource dataSource;
     private final OrderRowMapper orderRowMapper;
     private final OrderFieldSetMapper orderFieldSetMapper;
+    private final TrackedOrderItemProcessor trackedOrderItemProcessor;
+    private final FreeShippingProcessor freeShippingProcessor;
 
     @Value("classpath:shipped_orders.csv")
     private Resource flatFile;
@@ -98,10 +110,35 @@ public class ChunkBatchConfiguration {
     @Bean
     public Step chunkBasedStep() throws Exception {
         return stepBuilderFactory.get("chunkBasedStep")
-            .<Order, Order>chunk(CHUNK_SIZE)
+            .<Order, TrackedOrder>chunk(CHUNK_SIZE)
             .reader(dbItemReader())
+            .processor(compositeItemProcessor())
             .writer(jsonItemWriter())
             .build();
+    }
+
+    @Bean
+    public ItemProcessor<Order, TrackedOrder> compositeItemProcessor() {
+        return new CompositeItemProcessorBuilder<Order, TrackedOrder>()
+            .delegates(
+                orderValidatingItemProcessor(),
+                trackedOrderItemProcessor,
+                freeShippingProcessor,
+                freeShippingFilterProcessor()
+            )
+            .build();
+    }
+
+    @Bean
+    public ItemProcessor<Order, Order> orderValidatingItemProcessor() {
+        BeanValidatingItemProcessor<Order> itemProcessor = new BeanValidatingItemProcessor<>();
+        itemProcessor.setFilter(true);
+        return itemProcessor;
+    }
+
+    @Bean
+    public ItemProcessor<TrackedOrder, TrackedOrder> freeShippingFilterProcessor() {
+        return order -> order.isFreeShipping() ? order : null;
     }
 
     @Bean

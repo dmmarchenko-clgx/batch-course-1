@@ -1,10 +1,12 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.utils;
 
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import org.springframework.batch.item.database.ItemPreparedStatementSetter;
+
+import com.github.vendigo.batchcourse.model.Order;
 
 public class OrderItemPreparedStatementSetter implements ItemPreparedStatementSetter<Order> {
 

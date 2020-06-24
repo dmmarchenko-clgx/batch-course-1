@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.utils;
 
 import java.util.Random;
 

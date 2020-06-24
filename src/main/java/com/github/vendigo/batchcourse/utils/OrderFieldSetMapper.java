@@ -1,8 +1,10 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.utils;
 
 import org.springframework.batch.item.file.mapping.FieldSetMapper;
 import org.springframework.batch.item.file.transform.FieldSet;
 import org.springframework.stereotype.Component;
+
+import com.github.vendigo.batchcourse.model.Order;
 
 @Component
 public class OrderFieldSetMapper implements FieldSetMapper<Order> {

@@ -1,10 +1,12 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.utils;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
+
+import com.github.vendigo.batchcourse.model.Order;
 
 @Component
 public class OrderRowMapper implements RowMapper<Order> {

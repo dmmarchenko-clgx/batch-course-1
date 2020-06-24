@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.config;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -8,6 +8,8 @@ import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import com.github.vendigo.batchcourse.utils.FlowersSelectionStepExecutionListener;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

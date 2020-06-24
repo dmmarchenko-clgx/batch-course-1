@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse;
+package com.github.vendigo.batchcourse.config;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -11,6 +11,9 @@ import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+
+import com.github.vendigo.batchcourse.utils.CorrectItemDecider;
+import com.github.vendigo.batchcourse.utils.DeliveryDecider;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
