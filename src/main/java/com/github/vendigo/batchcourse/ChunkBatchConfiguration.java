@@ -18,6 +18,8 @@ import org.springframework.batch.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.item.json.JacksonJsonObjectMarshaller;
+import org.springframework.batch.item.json.builder.JsonFileItemWriterBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,7 +38,7 @@ public class ChunkBatchConfiguration {
     private static final String[] COLUMN_NAMES = new String[] { "order_id", "first_name", "last_name", "email", "cost", "item_id", "item_name", "ship_date" };
     private static final String INSERT_ORDER_SQL = "INSERT INTO SHIPPED_ORDER_OUTPUT "
         + "(order_id, first_name, last_name, email, item_id, item_name, cost, ship_date) "
-        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        + "VALUES (:orderId, :firstName, :lastName, :email, :itemId, :itemName, :cost, :shipDate)";
     private static final int CHUNK_SIZE = 10;
 
     private final JobBuilderFactory jobBuilderFactory;
@@ -98,7 +100,7 @@ public class ChunkBatchConfiguration {
         return stepBuilderFactory.get("chunkBasedStep")
             .<Order, Order>chunk(CHUNK_SIZE)
             .reader(dbItemReader())
-            .writer(jdbcItemWriter())
+            .writer(jsonItemWriter())
             .build();
     }
 
@@ -107,7 +109,16 @@ public class ChunkBatchConfiguration {
         return new JdbcBatchItemWriterBuilder<Order>()
             .dataSource(dataSource)
             .sql(INSERT_ORDER_SQL)
-            .itemPreparedStatementSetter(new OrderItemPreparedStatementSetter())
+            .beanMapped()
+            .build();
+    }
+
+    @Bean
+    public ItemWriter<Order> jsonItemWriter() {
+        return new JsonFileItemWriterBuilder<Order>()
+            .name("jsonItemWriter")
+            .resource(new FileSystemResource("out/shipped_orders_output.json"))
+            .jsonObjectMarshaller(new JacksonJsonObjectMarshaller<>())
             .build();
     }
 
