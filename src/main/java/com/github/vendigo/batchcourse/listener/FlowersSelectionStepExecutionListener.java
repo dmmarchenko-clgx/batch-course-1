@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse.utils;
+package com.github.vendigo.batchcourse.listener;
 
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepExecution;

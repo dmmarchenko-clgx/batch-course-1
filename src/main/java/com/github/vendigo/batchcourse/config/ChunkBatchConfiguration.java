@@ -28,13 +28,17 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import com.github.vendigo.batchcourse.listener.CustomRetryListener;
 import com.github.vendigo.batchcourse.model.Order;
 import com.github.vendigo.batchcourse.model.TrackedOrder;
-import com.github.vendigo.batchcourse.utils.FreeShippingProcessor;
+import com.github.vendigo.batchcourse.processor.FreeShippingProcessor;
+import com.github.vendigo.batchcourse.processor.TrackedOrderItemProcessor;
 import com.github.vendigo.batchcourse.utils.OrderFieldSetMapper;
+import com.github.vendigo.batchcourse.utils.OrderProcessingException;
 import com.github.vendigo.batchcourse.utils.OrderRowMapper;
-import com.github.vendigo.batchcourse.utils.TrackedOrderItemProcessor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,9 +50,9 @@ public class ChunkBatchConfiguration {
 
     private static final String[] FIELD_NAMES = new String[] { "orderId", "firstName", "lastName", "email", "cost", "itemId", "itemName", "shipDate" };
     private static final String[] COLUMN_NAMES = new String[] { "order_id", "first_name", "last_name", "email", "cost", "item_id", "item_name", "ship_date" };
-    private static final String INSERT_ORDER_SQL = "INSERT INTO SHIPPED_ORDER_OUTPUT "
-        + "(order_id, first_name, last_name, email, item_id, item_name, cost, ship_date) "
-        + "VALUES (:orderId, :firstName, :lastName, :email, :itemId, :itemName, :cost, :shipDate)";
+    private static final String INSERT_ORDER_SQL = "INSERT INTO TRACKED_ORDER "
+        + "(order_id, first_name, last_name, email, item_id, item_name, cost, ship_date, tracking_number, free_shipping) "
+        + "VALUES (:orderId, :firstName, :lastName, :email, :itemId, :itemName, :cost, :shipDate, :trackingNumber, :freeShipping)";
     private static final int CHUNK_SIZE = 10;
 
     private final JobBuilderFactory jobBuilderFactory;
@@ -67,6 +71,29 @@ public class ChunkBatchConfiguration {
         return jobBuilderFactory.get("chunkBasedJob")
             .start(chunkBasedStep())
             .build();
+    }
+
+    @Bean
+    public Step chunkBasedStep() throws Exception {
+        return stepBuilderFactory.get("chunkBasedStep")
+            .<Order, TrackedOrder>chunk(CHUNK_SIZE)
+            .reader(dbItemReader())
+            .processor(compositeItemProcessor())
+            .faultTolerant()
+            .retry(OrderProcessingException.class)
+            .retryLimit(3)
+            .listener(new CustomRetryListener())
+            .writer(jdbcItemWriter())
+            .taskExecutor(taskExecutor())
+            .build();
+    }
+
+    @Bean
+    public TaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(10);
+        return executor;
     }
 
     @Bean
@@ -104,16 +131,7 @@ public class ChunkBatchConfiguration {
             .queryProvider(queryProvider())
             .rowMapper(orderRowMapper)
             .pageSize(CHUNK_SIZE)
-            .build();
-    }
-
-    @Bean
-    public Step chunkBasedStep() throws Exception {
-        return stepBuilderFactory.get("chunkBasedStep")
-            .<Order, TrackedOrder>chunk(CHUNK_SIZE)
-            .reader(dbItemReader())
-            .processor(compositeItemProcessor())
-            .writer(jsonItemWriter())
+            .saveState(false)
             .build();
     }
 

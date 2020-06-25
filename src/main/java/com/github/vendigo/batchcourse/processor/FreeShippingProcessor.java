@@ -1,4 +1,4 @@
-package com.github.vendigo.batchcourse.utils;
+package com.github.vendigo.batchcourse.processor;
 
 import java.math.BigDecimal;
 

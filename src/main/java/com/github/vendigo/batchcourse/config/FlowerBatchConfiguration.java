@@ -9,7 +9,7 @@ import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.github.vendigo.batchcourse.utils.FlowersSelectionStepExecutionListener;
+import com.github.vendigo.batchcourse.listener.FlowersSelectionStepExecutionListener;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
